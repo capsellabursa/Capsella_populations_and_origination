@@ -1,0 +1,180 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(readxl)
+library(ggplot2)
+library(ggth)
+setwd("C:/Users/Capsella/Desktop/capsella/stat_files2")
+```
+
+```{r}
+SRAcapsella <- read_excel("C:/Users/Capsella/Downloads/SRAcapsella.xlsx")
+#EUR = SRAcapsella$Run[SRAcapsella$chloroplast_population == "EUR" | SRAcapsella$chloroplast_population =="EUR/ME"]
+#ME = SRAcapsella$Run[SRAcapsella$chloroplast_population == "ME"]
+#ASI = SRAcapsella$Run[SRAcapsella$chloroplast_population == "ASI"]
+#View(tab.m)
+```
+
+Доля картированных ридов на геном
+```{r}
+my.files <- list.files(pattern="*.tsv")
+p = unlist(strsplit(my.files[1], ""))
+tab = read.table(my.files[1], sep = "\t")
+tab = tab[,c(1,3)]
+colnames(tab) = c(paste(p[1:(length(p)-4)], collapse = ""),'feature')
+for (i in 2:length(my.files)){
+  p = unlist(strsplit(my.files[i], ""))
+  tab2 = read.table(my.files[i], sep = "\t")
+  tab2 = tab2[, c(1,3)]
+  colnames(tab2) = c(paste(p[1:(length(p)-4)], collapse = ""), 'feature')
+  tab = merge(tab, tab2, by = "feature", all=TRUE)
+}
+
+mapping.ratio = rep(0, (ncol(tab)-1))
+for (i in 1:(ncol(tab)-1)){
+  mapping.ratio[i] = paste(unlist(strsplit(as.character(unname(unlist(tab[3,c(2:ncol(tab))])))[i], ''))[1:4], collapse = "")
+}
+tab = as.data.frame(t(tab))
+tab$mapping.ratio = c('mapping.ratio' ,as.numeric(mapping.ratio))
+tab = transform(tab, mapping.ratio = as.numeric(mapping.ratio))
+tab$Run = rownames(tab)
+tab= tab[-1,]
+library(ggplot2)
+
+tab.m = merge(tab, SRAcapsella, by = "Run", all = T)
+odd = c("EUR", 'EUR', 'ME', 'ME', 'EUR', 'ME', 'EUR', 'EUR', 'EUR', 'ASI')
+tab.m$chloroplast_population[1:10] = odd
+tab.n = subset(tab.m, chloroplast_population == "EUR" |
+                 chloroplast_population == "ME"| 
+                 chloroplast_population == "ASI")
+
+
+ggplot(tab.n,aes(x=Run, y=mapping.ratio, fill = chloroplast_population)) + 
+  geom_bar(stat = "identity") + 
+  facet_wrap( ~ chloroplast_population, scales = "free_x")+
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+Среднее покрытие 
+```{r}
+library(ggplot2)
+setwd("C:/Users/Capsella/Desktop/capsella/csv2")
+
+my.files <- list.files(pattern="*.csv")
+library(readr)
+tab <- read_delim(my.files[1], "\t", escape_double = FALSE, col_names = FALSE, trim_ws = TRUE)
+p = unlist(strsplit(my.files[1], ""))
+colnames(tab) = c("gene",paste(p[1:(length(p)-4)], collapse = ""))
+for (i in 2:length(my.files)){
+  p = unlist(strsplit(my.files[i], ""))
+  tab2 = read_delim(my.files[i], "\t", escape_double = FALSE, col_names = FALSE, trim_ws = TRUE)
+  colnames(tab2) = c("gene",paste(p[1:(length(p)-4)], collapse = ""))
+  tab = merge(tab, tab2, by = "gene", all=TRUE)
+}
+means_NA_RM = as.data.frame(colMeans(tab[, 2:ncol(tab)], na.rm = T))
+colSums(is.na(tab))
+
+means_NA_RM$Run = rownames(means_NA_RM)
+tabmeans = merge(means_NA_RM, SRAcapsella, by = "Run", all = T)
+odd = c("EUR", 'EUR', 'ME', 'ME', 'EUR', 'ME', 'EUR', 'EUR', 'EUR', 'ASI' )
+tabmeans$chloroplast_population[1:10] = odd
+
+tab.nmean = subset(tabmeans, chloroplast_population == "EUR" |
+                 chloroplast_population == "ME"| 
+                 chloroplast_population == "ASI")
+
+colnames(tab.nmean) = c("Run", "mean_coverage", "chloroplast_population", "3", "4")
+ggplot(tab.nmean,aes(x=Run, y=mean_coverage, fill = chloroplast_population)) + 
+  geom_bar(stat = "identity") + 
+  facet_wrap( ~ chloroplast_population, scales = "free_x")+
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+
+отрисовка покрытия по генам
+```{r}
+my.files <- list.files(pattern="*.csv")
+library(readr)
+tab <- read_delim(my.files[1], "\t", escape_double = FALSE, col_names = FALSE, trim_ws = TRUE)
+p = unlist(strsplit(my.files[1], ""))
+colnames(tab) = c("gene",paste(p[1:(length(p)-4)], collapse = ""))
+for (i in 2:length(my.files)){
+  p = unlist(strsplit(my.files[i], ""))
+  tab2 = read_delim(my.files[i], "\t", escape_double = FALSE, col_names = FALSE, trim_ws = TRUE)
+  colnames(tab2) = c("gene",paste(p[1:(length(p)-4)], collapse = ""))
+  tab = merge(tab, tab2, by = "gene", all=TRUE)
+}
+
+tab[is.na(tab)] = 0
+tab.t = data.frame(t(tab))
+tab.t = tab.t[-1,]
+tab.no.ncbi = tab.t[1:10,]
+tab.no.ncbi$chloroplast_population = c("EUR", 'EUR', 'ME', 'ME', 'EUR', 'ME', 'EUR', 'EUR', 'EUR', 'ASI')
+tab.ncbi = tab.t[- c(1:10),]
+
+
+#colnames(tab.ncbi) = c("Run", 1:47817)
+merge.tabs = merge(tab.ncbi, SRAcapsella, by.y = "Run", by.x = "row.names", all = F)
+rownames(merge.tabs) = merge.tabs[,1] 
+merge.tabs = merge.tabs[, - c(1, (ncol(merge.tabs)-1): ncol(merge.tabs))]
+
+merge.tab = as.data.frame(rbind(merge.tabs, tab.no.ncbi))
+
+EUR.tab = subset(merge.tab, chloroplast_population == "EUR")
+ASI.tab = subset(merge.tab, chloroplast_population == "ASI")
+ME.tab = subset(merge.tab, chloroplast_population == "ME")
+
+EUR.tabs = apply(EUR.tab[, - ncol(EUR.tab)],2,as.numeric)
+ASI.tabs = apply(ASI.tab[, - ncol(ASI.tab)],2,as.numeric)
+ME.tabs = apply(ME.tab[, - ncol(ME.tab)],2,as.numeric)
+
+EUR.mean = colMeans(EUR.tabs)
+ASI.mean = colMeans(ASI.tabs)
+ME.mean = colMeans(ME.tabs)
+
+
+EUR.sd = apply(EUR.tabs,2,sd)
+ASI.sd = apply(ASI.tabs,2,sd)
+ME.sd = apply(ME.tabs,2,sd)
+
+EUR = data.frame(genes = tab$gene,
+                 mean = EUR.mean, 
+                 sd.h = EUR.mean + EUR.sd,
+                 sd.l = EUR.mean - EUR.sd,
+                 population = rep("EUR", length(EUR.mean)))
+
+ASI = data.frame(genes = tab$gene,
+                 mean = ASI.mean, 
+                 sd.h = ASI.mean + ASI.sd,
+                 sd.l = ASI.mean - ASI.sd,
+                 population = rep("ASI", length(ASI.mean)))
+ME = data.frame(genes = tab$gene,
+                 mean = ME.mean, 
+                 sd.h = ME.mean + ME.sd,
+                 sd.l = ME.mean - ME.sd,
+                 population = rep("ME", length(ME.mean)))
+
+bulk = rbind(EUR, ASI, ME)
+
+ggplot(bulk, aes(x=genes, y=mean, colour = population)) + 
+  geom_line(aes(group = 1)) + 
+  facet_grid(population~.) +
+  theme_classic() 
+  #theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+ordEUR = EUR[order(EUR$V2, decreasing = T),]
+#ordEUR2 = EUR2[order(EUR2$V2, decreasing = T),]
+ordASI = ASI[order(ASI$V2, decreasing = T),]
+ordME = ME[order(ME$V2, decreasing = T),]
+
+View(head(ordEUR, n = 10))
+View(head(ordEUR2, n = 10))
+View(ordASI)
+View(head(ordME, n = 10))
+```
+
